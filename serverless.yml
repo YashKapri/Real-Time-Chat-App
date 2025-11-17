@@ -1,0 +1,172 @@
+service: chat-realtime-app
+
+frameworkVersion: "3"
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: ap-south-1
+  stage: ${opt:stage, 'dev'}
+  environment:
+    AWS_NODEJS_CONNECTION_REUSE_ENABLED: "1"
+    STAGE: ${self:provider.stage}
+    AWS_REGION: ${self:provider.region}
+    CONNECTIONS_TABLE: ${self:service}-${self:provider.stage}-connections
+    MESSAGES_TABLE: ${self:service}-${self:provider.stage}-messages
+    ROOMS_TABLE: ${self:service}-${self:provider.stage}-rooms
+    USERS_TABLE: ${self:service}-${self:provider.stage}-users
+    UPLOADS_BUCKET_NAME: ${self:service}-${self:provider.stage}-uploads
+    FRONTEND_BUCKET_NAME: ${self:service}-${self:provider.stage}-frontend
+    JWT_SECRET: ${env:JWT_SECRET, 'dev-secret-change-me'}
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:PutItem
+            - dynamodb:GetItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+            - dynamodb:Query
+          Resource:
+            - arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.CONNECTIONS_TABLE}
+            - arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.CONNECTIONS_TABLE}/index/*
+            - arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.MESSAGES_TABLE}
+            - arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.ROOMS_TABLE}
+            - arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.USERS_TABLE}
+        - Effect: Allow
+          Action:
+            - execute-api:ManageConnections
+          Resource:
+            - arn:aws:execute-api:${self:provider.region}:*:*/*/*/@connections/*
+        - Effect: Allow
+          Action:
+            - s3:PutObject
+            - s3:GetObject
+          Resource:
+            - arn:aws:s3:::${self:provider.environment.UPLOADS_BUCKET_NAME}/*
+plugins:
+  - serverless-offline
+
+functions:
+  connect:
+    handler: backend/handlers/connect.handler
+    events:
+      - websocket:
+          route: $connect
+
+  disconnect:
+    handler: backend/handlers/disconnect.handler
+    events:
+      - websocket:
+          route: $disconnect
+
+  default:
+    handler: backend/handlers/default.handler
+    events:
+      - websocket:
+          route: $default
+
+  generateUploadUrl:
+    handler: backend/handlers/generateUploadUrl.handler
+    events:
+      - httpApi:
+          method: POST
+          path: /uploads/presign
+
+resources:
+  Resources:
+    ConnectionsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.CONNECTIONS_TABLE}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: connectionId
+            AttributeType: S
+          - AttributeName: roomId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: connectionId
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: roomIndex
+            KeySchema:
+              - AttributeName: roomId
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+
+    MessagesTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.MESSAGES_TABLE}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: roomId
+            AttributeType: S
+          - AttributeName: createdAt
+            AttributeType: S
+        KeySchema:
+          - AttributeName: roomId
+            KeyType: HASH
+          - AttributeName: createdAt
+            KeyType: RANGE
+
+    RoomsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.ROOMS_TABLE}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: roomId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: roomId
+            KeyType: HASH
+
+    UsersTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.USERS_TABLE}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: userId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: userId
+            KeyType: HASH
+
+    UploadsBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:provider.environment.UPLOADS_BUCKET_NAME}
+        CorsConfiguration:
+          CorsRules:
+            - AllowedOrigins:
+                - "*"
+              AllowedMethods:
+                - GET
+                - PUT
+                - POST
+              AllowedHeaders:
+                - "*"
+              MaxAge: 3000
+
+    FrontendBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:provider.environment.FRONTEND_BUCKET_NAME}
+        WebsiteConfiguration:
+          IndexDocument: index.html
+          ErrorDocument: index.html
+        AccessControl: PublicRead
+        CorsConfiguration:
+          CorsRules:
+            - AllowedOrigins:
+                - "*"
+              AllowedMethods:
+                - GET
+              AllowedHeaders:
+                - "*"
+              MaxAge: 3000

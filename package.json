@@ -1,0 +1,22 @@
+{
+  "name": "chat-realtime-backend",
+  "version": "1.0.0",
+  "description": "Serverless real-time chat backend using AWS Lambda, API Gateway WebSocket, DynamoDB, and S3.",
+  "main": "serverless.yml",
+  "scripts": {
+    "deploy": "serverless deploy",
+    "remove": "serverless remove",
+   "offline": "serverless offline start --httpPort 3001 --websocketPort 3005",
+    "lint": "echo \"No lint configured yet\"",
+    "test": "echo \"No tests configured yet\" && exit 0"
+  },
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "jsonwebtoken": "^9.0.2"
+  },
+  "devDependencies": {
+    "serverless": "^3.39.0",
+    "serverless-offline": "^13.0.0"
+  }
+}
