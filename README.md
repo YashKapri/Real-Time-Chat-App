@@ -1,4 +1,4 @@
-# Real-time Chat App (Serverless, AWS, React) ,
+# Real-time Chat App (Serverless, AWS, React) 
 
 Production-ready real-time chat application:
 
@@ -45,4 +45,5 @@ DynamoDB Tables
   - Rooms
 
 S3 (Uploads bucket) for user file uploads through pre-signed URLs.
+
 
